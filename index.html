@@ -20,14 +20,14 @@
                 margin-bottom: 20px;
             }
             .grid-cell {
-                width: 40px; /* Fixed size to ensure cells are square */
-                height: 40px; /* Fixed size to ensure cells are square */
+                width: 40px;
+                height: 40px;
                 text-align: center;
                 font-size: 20px;
                 border: 1px solid #333;
                 background-color: #f0f0f0;
                 cursor: pointer;
-                user-select: none; /* Prevent text selection */
+                user-select: none;
             }
             .grid-cell input {
                 width: 100%;
@@ -69,16 +69,39 @@
         <div id="grid-container"></div>
 
         <button
+            id="generate-button"
+            hx-post="/generate"
+            hx-include="#gridSize"
+            hx-swap="innerHTML"
+            hx-target="#grid-container"
+            hx-trigger="click"
+        >
+            Generate Puzzle
+        </button>
+
+        <button
             id="solve-button"
             hx-post="/solve"
             hx-include="#grid-container, #gridSize"
             hx-swap="innerHTML"
             hx-target="#solved-grid-container"
+            hx-on="htmx:afterRequest: setCellsReadOnly(true)"
         >
             Solve
         </button>
 
-        <div id="loading">Solving...</div>
+        <button
+            id="validate-button"
+            hx-post="/validate"
+            hx-include="#grid-container, #gridSize"
+            hx-trigger="click"
+            hx-swap="none"
+            hx-target="this"
+        >
+            Validate
+        </button>
+
+        <div id="loading">Processing...</div>
 
         <div id="solved-grid-container"></div>
 
@@ -96,7 +119,7 @@
                         cell.className = "grid-cell";
                         cell.dataset.row = i;
                         cell.dataset.col = j;
-                        cell.innerHTML = `<input type="text" name="cell-${i}-${j}" maxlength="1" readonly />`;
+                        cell.innerHTML = `<input type="text" name="cell-${i}-${j}" maxlength="1" />`;
                         cell.addEventListener("click", toggleCellValue);
                         container.appendChild(cell);
                     }
@@ -106,6 +129,9 @@
                     "solved-grid-container",
                 );
                 solvedContainer.style.gridTemplateColumns = `repeat(${size}, 40px)`;
+
+                // Allow user input after generating a puzzle
+                setCellsReadOnly(false);
             }
 
             function toggleCellValue(event) {
@@ -121,14 +147,28 @@
                     cell.classList.add("active");
                 }
 
-                // Optionally: Save the value to the form data (for form submission)
                 document.querySelector(
                     `input[name="cell-${cell.dataset.row}-${cell.dataset.col}"]`,
                 ).value = input.value;
             }
 
+            function setCellsReadOnly(readonly) {
+                const inputs = document.querySelectorAll(
+                    "#grid-container input",
+                );
+                inputs.forEach((input) => {
+                    input.readOnly = readonly;
+                });
+            }
+
             document
                 .getElementById("solve-button")
+                .addEventListener("click", function () {
+                    document.getElementById("loading").style.display = "block";
+                });
+
+            document
+                .getElementById("generate-button")
                 .addEventListener("click", function () {
                     document.getElementById("loading").style.display = "block";
                 });

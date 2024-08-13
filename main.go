@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"html/template"
 	"log"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Cell represents a single cell in the grid.
@@ -20,6 +22,8 @@ type Grid [][]*Cell
 func main() {
 	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/solve", solveHandler)
+	http.HandleFunc("/generate", generateHandler) // New handler for generating puzzles
+	http.HandleFunc("/validate", validateHandler) // New handler for validating the puzzle
 	log.Println("Server started at :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
@@ -85,6 +89,127 @@ func solveHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, response)
 
 	log.Println("Puzzle solved, response sent")
+}
+
+// generateHandler generates a valid puzzle and removes some cells for the user to solve.
+func generateHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("Generate request received")
+
+	// Parse form data
+	err := r.ParseForm()
+	if err != nil {
+		log.Printf("Error parsing form: %v\n", err)
+		http.Error(w, "Failed to parse form data", http.StatusBadRequest)
+		return
+	}
+
+	// Get and validate grid size
+	gridSizeStr := r.FormValue("gridSize")
+	size, err := strconv.Atoi(gridSizeStr)
+	if err != nil || size <= 0 {
+		log.Printf("Invalid grid size: %v\n", err)
+		http.Error(w, "Invalid grid size", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Grid size: %d\n", size)
+
+	// Generate a fully solved grid
+	grid := make(Grid, size)
+	for i := range grid {
+		grid[i] = make([]*Cell, size)
+		for j := range grid[i] {
+			grid[i][j] = &Cell{Value: nil}
+		}
+	}
+
+	// Solve the grid completely
+	solveBinairo(grid)
+
+	// Randomly remove cells to create the puzzle
+	rand.Seed(time.Now().UnixNano())
+	numCellsToRemove := (size * size) / 2
+	for numCellsToRemove > 0 {
+		i, j := rand.Intn(size), rand.Intn(size)
+		if grid[i][j].Value != nil {
+			grid[i][j].Value = nil
+			numCellsToRemove--
+		}
+	}
+
+	// Respond with the puzzle grid in HTML
+	response := renderSolvedGridHTML(grid)
+	w.Header().Set("Content-Type", "text/html")
+	fmt.Fprintln(w, response)
+
+	log.Println("Puzzle generated, response sent")
+}
+
+// validateHandler checks if the user's solution is valid.
+func validateHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("Validate request received")
+
+	// Parse form data
+	err := r.ParseForm()
+	if err != nil {
+		log.Printf("Error parsing form: %v\n", err)
+		http.Error(w, "Failed to parse form data", http.StatusBadRequest)
+		return
+	}
+
+	// Get and validate grid size
+	gridSizeStr := r.FormValue("gridSize")
+	size, err := strconv.Atoi(gridSizeStr)
+	if err != nil || size <= 0 {
+		log.Printf("Invalid grid size: %v\n", err)
+		http.Error(w, "Invalid grid size", http.StatusBadRequest)
+		return
+	}
+
+	log.Printf("Grid size: %d\n", size)
+
+	grid := make(Grid, size)
+	for i := range grid {
+		grid[i] = make([]*Cell, size)
+		for j := range grid[i] {
+			cellName := fmt.Sprintf("cell-%d-%d", i, j)
+			cellValue := r.FormValue(cellName)
+			if cellValue == "" {
+				log.Println("Grid is not fully filled in")
+				fmt.Fprintln(w, "Grid is not fully filled in")
+				return
+			}
+			val, err := strconv.Atoi(cellValue)
+			if err != nil {
+				log.Printf("Invalid cell value %s: %v\n", cellValue, err)
+				http.Error(w, "Invalid cell value", http.StatusBadRequest)
+				return
+			}
+			grid[i][j] = &Cell{Value: &val}
+		}
+	}
+
+	// Validate the grid
+	valid := true
+	for i := 0; i < size; i++ {
+		for j := 0; j < size; j++ {
+			if !isValid(grid, i, j, *grid[i][j].Value) {
+				valid = false
+				break
+			}
+		}
+		if !valid {
+			break
+		}
+	}
+
+	if valid {
+		log.Println("Grid is valid")
+		fmt.Fprintln(w, "valid")
+	} else {
+		log.Println("Grid is invalid")
+		fmt.Fprintln(w, "invalid")
+	}
 }
 
 // solveBinairo implements the Binairo solving algorithm.
