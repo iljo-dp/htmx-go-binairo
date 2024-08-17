@@ -40,15 +40,9 @@
                 cursor: pointer;
                 outline: none;
             }
-            .grid-cell.active {
-                background-color: #e0e0e0;
-            }
-            #loading {
-                display: none;
-                font-size: 20px;
-                font-weight: bold;
-                color: #007bff;
-                margin-bottom: 20px;
+            .grid-cell input[readonly] {
+                background-color: #ffcccc;
+                cursor: not-allowed;
             }
         </style>
     </head>
@@ -102,7 +96,6 @@
         </button>
 
         <div id="loading">Processing...</div>
-
         <div id="solved-grid-container"></div>
 
         <script>
@@ -117,68 +110,30 @@
                     for (let j = 0; j < size; j++) {
                         const cell = document.createElement("div");
                         cell.className = "grid-cell";
-                        cell.dataset.row = i;
-                        cell.dataset.col = j;
                         cell.innerHTML = `<input type="text" name="cell-${i}-${j}" maxlength="1" />`;
-                        cell.addEventListener("click", toggleCellValue);
                         container.appendChild(cell);
                     }
                 }
-
-                const solvedContainer = document.getElementById(
-                    "solved-grid-container",
-                );
-                solvedContainer.style.gridTemplateColumns = `repeat(${size}, 40px)`;
-
-                // Allow user input after generating a puzzle
-                setCellsReadOnly(false);
-            }
-
-            function toggleCellValue(event) {
-                const cell = event.currentTarget;
-                const input = cell.querySelector("input");
-                let currentValue = input.value;
-
-                if (currentValue === "" || currentValue === "1") {
-                    input.value = "0";
-                    cell.classList.remove("active");
-                } else if (currentValue === "0") {
-                    input.value = "1";
-                    cell.classList.add("active");
-                }
-
-                document.querySelector(
-                    `input[name="cell-${cell.dataset.row}-${cell.dataset.col}"]`,
-                ).value = input.value;
             }
 
             function setCellsReadOnly(readonly) {
-                const inputs = document.querySelectorAll(
-                    "#grid-container input",
+                const cells = document.querySelectorAll(
+                    "#solved-grid-container input",
                 );
-                inputs.forEach((input) => {
-                    input.readOnly = readonly;
+                cells.forEach((cell) => {
+                    if (readonly) {
+                        cell.setAttribute("readonly", true);
+                        cell.style.backgroundColor = "#ffcccc";
+                    } else {
+                        cell.removeAttribute("readonly");
+                        cell.style.backgroundColor = "";
+                    }
                 });
             }
 
-            document
-                .getElementById("solve-button")
-                .addEventListener("click", function () {
-                    document.getElementById("loading").style.display = "block";
-                });
-
-            document
-                .getElementById("generate-button")
-                .addEventListener("click", function () {
-                    document.getElementById("loading").style.display = "block";
-                });
-
-            document.addEventListener("htmx:afterSwap", function () {
-                document.getElementById("loading").style.display = "none";
+            document.addEventListener("DOMContentLoaded", function () {
+                updateGrid();
             });
-
-            // Initialize the grid
-            updateGrid();
         </script>
     </body>
 </html>
