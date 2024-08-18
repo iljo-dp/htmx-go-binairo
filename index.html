@@ -52,19 +52,43 @@
     </head>
     <body>
         <h1>Binairo Game</h1>
+        <form id="settings-form">
+            <label for="gridSize">Grid Size:</label>
+            <input
+                type="number"
+                id="gridSize"
+                name="gridSize"
+                min="4"
+                value="6"
+                step="2"
+                hx-post="/generate"
+                hx-trigger="change"
+                hx-target="#grid-container"
+                hx-swap="innerHTML"
+            />
+        </form>
 
         <label for="gridSize">Grid Size:</label>
-        <input
-            type="number"
-            id="gridSize"
-            name="gridSize"
-            min="4"
-            value="6"
-            step="2"
-            oninput="updateGrid()"
-        />
-
-        <div id="grid-container"></div>
+        <div id="grid-container">
+            <!-- When generating the grid, add hx-post attributes to each cell -->
+            {{ range $i, $row := .Grid }} {{ range $j, $cell := $row }}
+            <div
+                class="grid-cell"
+                hx-post="/toggleCell"
+                hx-vals='{"row": {{ $i }}, "col": {{ $j }}}'
+                hx-target="this"
+                hx-swap="outerHTML"
+            >
+                <input
+                    type="text"
+                    name="cell-{{ $i }}-{{ $j }}"
+                    maxlength="1"
+                    value="{{ if $cell.Value }}{{ $cell.Value }}{{ end }}"
+                    readonly="{{ if $cell.ReadOnly }}true{{ end }}"
+                />
+            </div>
+            {{ end }} {{ end }}
+        </div>
 
         <button
             id="generate-button"
@@ -102,77 +126,5 @@
 
         <div id="loading">Processing...</div>
         <div id="solved-grid-container"></div>
-
-        <script>
-            // Updates the grid based on the grid size input
-            function updateGrid() {
-                const size = document.getElementById("gridSize").value;
-                const container = document.getElementById("grid-container");
-
-                container.style.gridTemplateColumns = `repeat(${size}, 40px)`;
-                container.innerHTML = ""; // Clear existing grid
-
-                for (let i = 0; i < size; i++) {
-                    for (let j = 0; j < size; j++) {
-                        const cellDiv = document.createElement("div");
-                        cellDiv.className = "grid-cell";
-                        cellDiv.onclick = () => toggleCell(cellDiv);
-                        cellDiv.innerHTML = `<input type="text" name="cell-${i}-${j}" maxlength="1" value="" />`;
-                        container.appendChild(cellDiv);
-                    }
-                }
-            }
-
-            // Toggles the cell content between 0, 1, and empty
-            function toggleCell(cellDiv) {
-                const input = cellDiv.querySelector("input");
-                if (cellDiv.classList.contains("readonly")) return; // Don't toggle if the cell is readonly
-
-                switch (input.value) {
-                    case "":
-                        input.value = "0";
-                        break;
-                    case "0":
-                        input.value = "1";
-                        break;
-                    case "1":
-                        input.value = "";
-                        break;
-                }
-            }
-
-            // Reattach the toggle functionality to all grid cells after generating a new puzzle
-            function attachToggleEvents() {
-                const cells = document.querySelectorAll(
-                    "#grid-container .grid-cell",
-                );
-                cells.forEach((cellDiv) => {
-                    if (!cellDiv.classList.contains("readonly")) {
-                        cellDiv.onclick = () => toggleCell(cellDiv);
-                    }
-                });
-            }
-
-            // Makes all cells readonly (used after solving the puzzle)
-            function setCellsReadOnly(readonly) {
-                const cells = document.querySelectorAll(
-                    "#solved-grid-container .grid-cell",
-                );
-                cells.forEach((cellDiv) => {
-                    const input = cellDiv.querySelector("input");
-                    if (readonly) {
-                        cellDiv.classList.add("readonly");
-                        input.readOnly = true;
-                    } else {
-                        cellDiv.classList.remove("readonly");
-                        input.readOnly = false;
-                    }
-                });
-            }
-
-            document.addEventListener("DOMContentLoaded", function () {
-                updateGrid(); // Initialize grid on page load
-            });
-        </script>
     </body>
 </html>
