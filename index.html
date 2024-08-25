@@ -20,14 +20,17 @@
                 margin-bottom: 20px;
             }
             .grid-cell {
-                width: 40px; /* Fixed size to ensure cells are square */
-                height: 40px; /* Fixed size to ensure cells are square */
+                width: 40px;
+                height: 40px;
                 text-align: center;
                 font-size: 20px;
                 border: 1px solid #333;
                 background-color: #f0f0f0;
                 cursor: pointer;
-                user-select: none; /* Prevent text selection */
+                user-select: none;
+                display: flex;
+                align-items: center;
+                justify-content: center;
             }
             .grid-cell input {
                 width: 100%;
@@ -39,16 +42,11 @@
                 box-sizing: border-box;
                 cursor: pointer;
                 outline: none;
+                pointer-events: none; /* Prevents the input from being directly clickable */
             }
-            .grid-cell.active {
-                background-color: #e0e0e0;
-            }
-            #loading {
-                display: none;
-                font-size: 20px;
-                font-weight: bold;
-                color: #007bff;
-                margin-bottom: 20px;
+            .grid-cell.readonly {
+                background-color: #ffcccc;
+                cursor: not-allowed;
             }
         </style>
     </head>
@@ -69,20 +67,44 @@
         <div id="grid-container"></div>
 
         <button
+            id="generate-button"
+            hx-post="/generate"
+            hx-include="#gridSize"
+            hx-swap="innerHTML"
+            hx-target="#grid-container"
+            hx-trigger="click"
+            hx-on="htmx:afterRequest: attachToggleEvents()"
+        >
+            Generate Puzzle
+        </button>
+
+        <button
             id="solve-button"
             hx-post="/solve"
             hx-include="#grid-container, #gridSize"
             hx-swap="innerHTML"
             hx-target="#solved-grid-container"
+            hx-on="htmx:afterRequest: setCellsReadOnly(true)"
         >
             Solve
         </button>
 
-        <div id="loading">Solving...</div>
+        <button
+            id="validate-button"
+            hx-post="/validate"
+            hx-include="#grid-container, #gridSize"
+            hx-trigger="click"
+            hx-swap="none"
+            hx-target="this"
+        >
+            Validate
+        </button>
 
+        <div id="loading">Processing...</div>
         <div id="solved-grid-container"></div>
 
         <script>
+            // Updates the grid based on the grid size input
             function updateGrid() {
                 const size = document.getElementById("gridSize").value;
                 const container = document.getElementById("grid-container");
@@ -92,53 +114,65 @@
 
                 for (let i = 0; i < size; i++) {
                     for (let j = 0; j < size; j++) {
-                        const cell = document.createElement("div");
-                        cell.className = "grid-cell";
-                        cell.dataset.row = i;
-                        cell.dataset.col = j;
-                        cell.innerHTML = `<input type="text" name="cell-${i}-${j}" maxlength="1" readonly />`;
-                        cell.addEventListener("click", toggleCellValue);
-                        container.appendChild(cell);
+                        const cellDiv = document.createElement("div");
+                        cellDiv.className = "grid-cell";
+                        cellDiv.onclick = () => toggleCell(cellDiv);
+                        cellDiv.innerHTML = `<input type="text" name="cell-${i}-${j}" maxlength="1" value="" />`;
+                        container.appendChild(cellDiv);
                     }
                 }
-
-                const solvedContainer = document.getElementById(
-                    "solved-grid-container",
-                );
-                solvedContainer.style.gridTemplateColumns = `repeat(${size}, 40px)`;
             }
 
-            function toggleCellValue(event) {
-                const cell = event.currentTarget;
-                const input = cell.querySelector("input");
-                let currentValue = input.value;
+            // Toggles the cell content between 0, 1, and empty
+            function toggleCell(cellDiv) {
+                const input = cellDiv.querySelector("input");
+                if (cellDiv.classList.contains("readonly")) return; // Don't toggle if the cell is readonly
 
-                if (currentValue === "" || currentValue === "1") {
-                    input.value = "0";
-                    cell.classList.remove("active");
-                } else if (currentValue === "0") {
-                    input.value = "1";
-                    cell.classList.add("active");
+                switch (input.value) {
+                    case "":
+                        input.value = "0";
+                        break;
+                    case "0":
+                        input.value = "1";
+                        break;
+                    case "1":
+                        input.value = "";
+                        break;
                 }
-
-                // Optionally: Save the value to the form data (for form submission)
-                document.querySelector(
-                    `input[name="cell-${cell.dataset.row}-${cell.dataset.col}"]`,
-                ).value = input.value;
             }
 
-            document
-                .getElementById("solve-button")
-                .addEventListener("click", function () {
-                    document.getElementById("loading").style.display = "block";
+            // Reattach the toggle functionality to all grid cells after generating a new puzzle
+            function attachToggleEvents() {
+                const cells = document.querySelectorAll(
+                    "#grid-container .grid-cell",
+                );
+                cells.forEach((cellDiv) => {
+                    if (!cellDiv.classList.contains("readonly")) {
+                        cellDiv.onclick = () => toggleCell(cellDiv);
+                    }
                 });
+            }
 
-            document.addEventListener("htmx:afterSwap", function () {
-                document.getElementById("loading").style.display = "none";
+            // Makes all cells readonly (used after solving the puzzle)
+            function setCellsReadOnly(readonly) {
+                const cells = document.querySelectorAll(
+                    "#solved-grid-container .grid-cell",
+                );
+                cells.forEach((cellDiv) => {
+                    const input = cellDiv.querySelector("input");
+                    if (readonly) {
+                        cellDiv.classList.add("readonly");
+                        input.readOnly = true;
+                    } else {
+                        cellDiv.classList.remove("readonly");
+                        input.readOnly = false;
+                    }
+                });
+            }
+
+            document.addEventListener("DOMContentLoaded", function () {
+                updateGrid(); // Initialize grid on page load
             });
-
-            // Initialize the grid
-            updateGrid();
         </script>
     </body>
 </html>
